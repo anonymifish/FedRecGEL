@@ -1,0 +1,23 @@
+{
+  "task_name": "var=2",
+  "target_model": "final_model.pth",
+  "method": "adv",
+  "model": "multvae",
+  "attribute": "gender",
+  "lr": 1,
+  "batch_size": 256,
+  "dataset_path": "data/datasets/",
+  "dataset": "ml-1m",
+  "num_ng": 4,
+  "test_num_ng": 99,
+  "device": "cuda:1",
+  "global_epochs": 1200,
+  "local_epochs": 1,
+  "adv_lr": 0.01,
+  "local_lr": 0.01,
+  "global_lr": 0.001,
+  "grad_scaling": 400,
+  "mu_std": 1.41,
+  "precode": "on",
+  "fraction": 0.1
+}
