@@ -2,7 +2,6 @@ import os
 
 import numpy as np
 import pandas as pd
-import scipy.sparse as sp
 from torch.utils.data import DataLoader
 
 from data.dataset import RecDataset

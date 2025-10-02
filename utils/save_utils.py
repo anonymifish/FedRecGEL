@@ -66,7 +66,7 @@ def check_repeat_running(args):
 
 
 def construct_target_model_path(args, target_model_path, target_model):
-    if args.method == 'original' or args.method == 'dp':
+    if args.method == 'original':
         path = 'weights' if args.task_name == 'default' else f'weights-{args.task_name}'
     else:
         path = f'weights-attribute_{args.attribute}' if args.task_name == 'default' else f'weights-attribute_{args.attribute}-{args.task_name}'

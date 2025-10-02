@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from models.multvae import MultVAE
+
 from models.fedrap import RAPBase
-from torch.utils.data import TensorDataset, DataLoader
+
 
 def hit(gt_item, pred_items):
     if gt_item in pred_items:
@@ -23,26 +23,11 @@ def top100_metrics(model, test_loader):
     ndcg_5_list, ndcg_10_list, ndcg_15_list, ndcg_20_list = [], [], [], []
 
     device = next(model.parameters()).device
-    if isinstance(model, MultVAE):
-        # gt_item_tensor = torch.empty((0,), dtype=torch.float32)
-        select_item_tensor = torch.empty((0, 100), dtype=torch.int)
-        for user, item, label in test_loader:
-            # gt_item_tensor = torch.cat((gt_item_tensor, item[0].unsqueeze(dim=0)))
-            select_item_tensor = torch.cat((select_item_tensor, item.unsqueeze(dim=0)), dim=0)
-        dataset = TensorDataset(model.interaction, select_item_tensor, torch.zeros(len(select_item_tensor)))
-        test_loader = DataLoader(dataset, batch_size=1)
+
     for user, item, label in test_loader:
         user = user.to(device)
 
-        if isinstance(model, MultVAE):
-            item = item.to(device)
-            predictions, _ = model(user, item)
-            item = item.squeeze()
-            predictions = predictions.squeeze()
-            # masked_tensor = torch.full_like(predictions, float('-inf'))
-            predictions = predictions[item]
-            gt_item = item[0].item()
-        elif isinstance(model, RAPBase):
+        if isinstance(model, RAPBase):
             item = item.to(device).flip(dims=[0])
             predictions, _, _ = model(user, item)
             gt_item = item[-1].item()
@@ -62,4 +47,3 @@ def top100_metrics(model, test_loader):
         hr_return.append(np.mean(eval(f'hr_{topk}_list')))
         ndcg_return.append(np.mean(eval(f'ndcg_{topk}_list')))
     return hr_return, ndcg_return
-

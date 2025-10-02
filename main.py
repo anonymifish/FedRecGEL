@@ -3,10 +3,9 @@ import os
 
 import torch.backends.cudnn as cudnn
 
-from methods.adv import adv
 from methods.original import original
-from utils.save_utils import construct_logger, check_repeat_running
-from methods.dp import dp
+from utils.save_utils import construct_logger
+
 
 def initialize_settings(path):
     class Args:
@@ -27,15 +26,8 @@ def initialize_settings(path):
 
 
 def federal_rec(args):
-    # if check_repeat_running(args):
-    #     args.logger.info('This setting exists')
-    # else:
-        if args.method == 'original':
-            original(args)
-        elif args.method == 'adv':
-            adv(args)
-        elif args.method == 'dp':
-            dp(args)
+    if args.method == 'original':
+        original(args)
  
 
 if __name__ == '__main__':

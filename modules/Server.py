@@ -1,12 +1,10 @@
 import random
+
 from modules.ClientCluster import ClientCluster
-from models.fedrap import FedRAPServer
-from models.multvae import MultVAEServer
-from models.ncf import NCFServer
 
 
 class Server():
-    def __init__(self, serve_model: FedRAPServer | MultVAEServer | NCFServer, client_cluster: ClientCluster, fraction=0.1):
+    def __init__(self, serve_model, client_cluster: ClientCluster, fraction=0.1):
         self.serve_model = serve_model
         self.serve_model.init_serve_weights()
         self.client_cluster = client_cluster
@@ -14,12 +12,11 @@ class Server():
         self.fraction = fraction
         self.progress = None
 
-
     def select_clients(self, clients, fraction=0.1):
         if fraction == 0:
             idx = random.sample(range(len(clients)), 1)
         else:
-            idx = random.sample(range(len(clients)), int(fraction*len(clients)))
+            idx = random.sample(range(len(clients)), int(fraction * len(clients)))
         return idx
 
     def send_serve_modules(self, c_list):
@@ -38,7 +35,3 @@ class Server():
             self.send_serve_modules([i])
             self.recieve_serve_modules_grad([i], len(c_list), loss_list)
         self.serve_model.fit_serve_epoch()
-
-
-
-
