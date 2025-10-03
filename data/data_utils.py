@@ -15,6 +15,8 @@ def load_all(args):
 
     user_num = train_data['user'].max() + 1
     item_num = train_data['item'].max() + 1
+    if args.dataset == 'amazon_video':
+        item_num = 11830
 
     train_data = train_data.values.tolist()
 

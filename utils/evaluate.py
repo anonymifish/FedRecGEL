@@ -26,7 +26,6 @@ def top100_metrics(model, test_loader):
 
     for user, item, label in test_loader:
         user = user.to(device)
-
         if isinstance(model, RAPBase):
             item = item.to(device).flip(dims=[0])
             predictions, _, _ = model(user, item)
