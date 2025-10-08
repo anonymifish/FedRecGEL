@@ -1,5 +1,5 @@
 {
-  "task_name": "fedrecgel-both_rho0.02-s2",
+  "task_name": "run_name",
   "method": "original",
   "model": "ncf",
   "batch_size": 256,
