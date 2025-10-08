@@ -1,16 +1,23 @@
 {
-  "task_name": "default",
+  "task_name": "fedrecgel-both_rho0.02-s2",
   "method": "original",
   "model": "ncf",
   "batch_size": 256,
   "dataset_path": "data/datasets/",
-  "dataset": "lastfm_2k",
+  "dataset": "filmtrust",
   "num_ng": 4,
   "test_num_ng": 99,
-  "device": "cuda:0",
+  "device": "cuda:1",
   "global_epochs": 100,
   "local_epochs": 1,
   "local_lr": 0.1,
   "global_lr": 1.5,
-  "fraction": 0.1
+  "fraction": 0.1,
+  "attr": {
+    "method": "fedrecgel",
+    "rho_sh": 0.02,
+    "rho_ns": 0.02,
+    "ablate_sh_sam": false,
+    "ablate_ns_sam": false
+  }
 }

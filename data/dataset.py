@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 from torch.utils.data import Dataset
 
 
@@ -30,7 +31,7 @@ class RecDataset(Dataset):
             u = x[0]
             for t in range(self.num_ng):
                 j = np.random.randint(self.num_item)
-                while (u, j) in self.train_mat:
+                while self.train_mat[u, j] == 1:
                     j = np.random.randint(self.num_item)
                 self.features_ng.append([u, j])
 

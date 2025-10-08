@@ -37,6 +37,7 @@ class NCF(nn.Module):
     def get_user_embedding_grad(self):
         return [self.get_user_embedding_weight().grad]
 
+
 class NCFServer(NCF, BaseServerModel):
     def __init__(self, item_num, factor_num=32, num_layers=3, dropout=0.0, global_lr=0.001):
         NCF.__init__(self)
@@ -70,10 +71,10 @@ class NCFServer(NCF, BaseServerModel):
         for m in self.modules():
             if isinstance(m, nn.Linear) and m.bias is not None:
                 m.bias.data.zero_()
-            
+
     def get_server_modules(self):
         return torch.nn.ModuleList([self.embed_item_gmf, self.embed_item_mlp, self.mlp_layers, self.predict_layer])
-    
+
     def recieve_server_modules_grad(self, modules_grad_list, select_user_num):
         for serve_modules, *client_modules in zip(self.get_server_modules().parameters(), *modules_grad_list):
             if serve_modules.grad is None:
@@ -84,8 +85,10 @@ class NCFServer(NCF, BaseServerModel):
         self.serve_optimizer.step()
         self.serve_optimizer.zero_grad()
 
+
 class NCFClient(NCF, BaseClientModel):
-    def __init__(self, user_interaction, local_epochs, local_lr, uid=torch.tensor(0), factor_num=32, num_layers=3, attr=None):
+    def __init__(self, user_interaction, local_epochs, local_lr, uid=torch.tensor(0), factor_num=32, num_layers=3,
+                 attr=None):
         NCF.__init__(self)
         BaseClientModel.__init__(self, local_epochs, local_lr)
         self.embed_user_gmf = nn.Embedding(1, factor_num)
@@ -93,7 +96,8 @@ class NCFClient(NCF, BaseClientModel):
         self.client_optimizer = torch.optim.Adam(self.get_client_modules().parameters(), lr=self.local_lr)
         self.register_buffer("uid", uid)
         self.register_buffer("interaction", user_interaction)
-        self.register_buffer("attr", attr)
+        # self.register_buffer("attr", attr)
+        self.attr = attr
         self.init_client_weight()
 
     def init_client_weight(self):
@@ -127,11 +131,11 @@ class NCFClient(NCF, BaseClientModel):
     def calculate_loss(self, loss_list):
         loss_fn = nn.BCEWithLogitsLoss()
         users, items, labels = self.sample_user_pos_neg()
-        
+
         bs = 128
         n_samples = len(users)
         total_loss = 0
-        
+
         for i in range(0, n_samples, bs):
             u_batch = users[i:i + bs]
             i_batch = items[i:i + bs]
@@ -146,20 +150,92 @@ class NCFClient(NCF, BaseClientModel):
 
         return total_loss
 
+    def calculate_loss_from_batch(self, loss_list, users, items, labels, loss_name):
+        loss_fn = nn.BCEWithLogitsLoss()
+
+        bs = 128
+        n_samples = len(users)
+        total_loss = 0
+
+        for i in range(0, n_samples, bs):
+            u_batch = users[i:i + bs]
+            i_batch = items[i:i + bs]
+            l_batch = labels[i:i + bs]
+            pred = self.forward(u_batch, i_batch)
+            loss = loss_fn(pred, l_batch.float())
+            total_loss += loss
+
+        if loss_name not in loss_list:
+            loss_list[loss_name] = []
+        loss_list[loss_name].append(total_loss.item())
+
+        return total_loss
+
     def fit_client_epochs(self, loss_list):
         self.train()
         serve_optimizer = torch.optim.Adam(self.get_server_modules().parameters(), lr=self.local_lr)
-        for epoch in range(self.local_epochs):
+
+        if self.attr['method'] == 'original':
+            for epoch in range(self.local_epochs):
+                self.client_optimizer.zero_grad()
+                serve_optimizer.zero_grad()
+                loss = self.calculate_loss(loss_list)
+                loss.backward()
+                self.client_optimizer.step()
+                serve_optimizer.step()
+        else:
+            users, items, labels = self.sample_user_pos_neg()
+
+            ns_params = _group_params(self.get_client_modules())
+            sh_params = _group_params(self.get_server_modules())
+
             self.client_optimizer.zero_grad()
             serve_optimizer.zero_grad()
-            loss = self.calculate_loss(loss_list)
+
+            loss = self.calculate_loss_from_batch(loss_list, users, items, labels, 'ncf_total_loss')
             loss.backward()
+
+            ns_grad_base = _save_grads(ns_params)
+            sh_grad_base = _save_grads(sh_params)
+
+            if self.attr['ablate_sh_sam']:
+                sh_sam_grads = sh_grad_base
+            else:
+                sh_eps = _sam_perturb_from_grads(sh_params, sh_grad_base, self.attr['rho_sh'])
+                self.client_optimizer.zero_grad()
+                serve_optimizer.zero_grad()
+                loss_sam_sh = self.calculate_loss_from_batch(loss_list, users, items, labels, 'sh_sam_loss')
+                loss_sam_sh.backward()
+                sh_sam_grads = _save_grads(sh_params)
+                _sam_revert(sh_params, sh_eps)
+                self.client_optimizer.zero_grad()
+                serve_optimizer.zero_grad()
+
+            if self.attr['ablate_ns_sam']:
+                ns_sam_grads = ns_grad_base
+            else:
+                ns_eps = _sam_perturb_from_grads(ns_params, ns_grad_base, self.attr['rho_ns'])
+                self.client_optimizer.zero_grad()
+                serve_optimizer.zero_grad()
+                loss_sam_ns = self.calculate_loss_from_batch(loss_list, users, items, labels, 'ns_sam_loss')
+                loss_sam_ns.backward()
+                ns_sam_grads = _save_grads(ns_params)
+                _sam_revert(ns_params, ns_eps)
+                self.client_optimizer.zero_grad()
+                serve_optimizer.zero_grad()
+
+            with torch.no_grad():
+                for p, g in zip(ns_params, ns_sam_grads):
+                    p.grad = None if g is None else g.clone()
+                for p, g in zip(sh_params, sh_sam_grads):
+                    p.grad = None if g is None else g.clone()
+
             self.client_optimizer.step()
             serve_optimizer.step()
         modules_grad_list = [p.grad.clone().detach() for p in self.get_server_modules().parameters()]
         self.del_server_modules()
         return modules_grad_list
-    
+
     def recieve_server_modules(self, serve_modules):
         self.embed_item_gmf = copy.deepcopy(serve_modules[0])
         self.embed_item_mlp = copy.deepcopy(serve_modules[1])
@@ -168,7 +244,7 @@ class NCFClient(NCF, BaseClientModel):
 
     def get_server_modules(self):
         return torch.nn.ModuleList([self.embed_item_gmf, self.embed_item_mlp, self.mlp_layers, self.predict_layer])
- 
+
     def get_client_modules(self):
         return torch.nn.ModuleList([self.embed_user_gmf, self.embed_user_mlp])
 
@@ -178,25 +254,71 @@ class NCFClient(NCF, BaseClientModel):
         # Get embedding dimensions from the first client
         factor_num = clients_list[0].embed_user_gmf.weight.shape[1]
         mlp_factor_num = clients_list[0].embed_user_mlp.weight.shape[1]
-        
+
         # Create new embeddings for all users
         self.embed_user_gmf = nn.Embedding(total_users, factor_num)
         self.embed_user_mlp = nn.Embedding(total_users, mlp_factor_num)
-        
+
         # Copy embeddings from each client
         for i, client in enumerate(clients_list):
             self.embed_user_gmf.weight.data[i] = client.embed_user_gmf.weight.data[0]
             self.embed_user_mlp.weight.data[i] = client.embed_user_mlp.weight.data[0]
-            
+
         # Copy server modules
         self.embed_item_gmf = serve_model.embed_item_gmf
         self.embed_item_mlp = serve_model.embed_item_mlp
         self.mlp_layers = serve_model.mlp_layers
         self.predict_layer = serve_model.predict_layer
 
-    
     def del_server_modules(self):
         del self.embed_item_gmf
         del self.embed_item_mlp
         del self.mlp_layers
         del self.predict_layer
+
+
+# **********************************************************************************************************************#
+#                                                                                                                      #
+#                      Auxiliary Functions For FedRecGEL: Sharpness-Aware Minimization                                 #
+#                                                                                                                      #
+# **********************************************************************************************************************#
+
+def _group_params(modules):
+    return [p for m in modules for p in m.parameters() if p.requires_grad]
+
+
+def _save_grads(params):
+    return [None if p.grad is None else p.grad.detach().clone() for p in params]
+
+
+def _sam_perturb_from_grads(params, save_grads, rho):
+    grad_norm_squre = 0.0
+    for g in save_grads:
+        if g is not None:
+            grad_norm_squre = grad_norm_squre + (g * g).sum()
+    grad_norm = grad_norm_squre.sqrt()
+
+    eps_list = []
+
+    if grad_norm == 0 or rho == 0:
+        for p in params:
+            eps_list.append(torch.zeros_like(p))
+        return eps_list
+
+    scale = rho / (grad_norm + 1e-12)
+    with torch.no_grad():
+        for p, g in zip(params, save_grads):
+            if g is None:
+                eps = torch.zeros_like(p)
+            else:
+                eps = g * scale
+                p.add_(eps)
+            eps_list.append(eps)
+
+    return eps_list
+
+
+def _sam_revert(params, eps_list):
+    with torch.no_grad():
+        for p, eps in zip(params, eps_list):
+            p.sub_(eps)

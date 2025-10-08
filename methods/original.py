@@ -16,7 +16,7 @@ def original(args):
     clients_list = []
     for i in tqdm(range(user_num), desc="Preparing client models"):
         clients_list.append(prepare_rec_model(args.model, 1, item_num, train_mat[i:i + 1, :],
-                                              local_epochs=args.local_epochs, local_lr=args.local_lr))
+                                              local_epochs=args.local_epochs, local_lr=args.local_lr, attr=args.attr))
     client_cluster = ClientCluster(clients_list)
     serve_model = prepare_rec_model(args.model, user_num, item_num, global_lr=args.global_lr,
                                     model_type="serve")
