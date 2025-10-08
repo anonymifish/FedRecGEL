@@ -1,7 +1,9 @@
+import copy
+import random
+
 import torch
 import torch.nn as nn
-import random
-import copy
+
 from models.base_federated import BaseServerModel, BaseClientModel
 
 
@@ -47,6 +49,7 @@ class RAPBase(nn.Module):
     def get_user_embedding_grad(self):
         return [self.item_personality.weight.grad]
 
+
 class FedRAPServer(RAPBase, BaseServerModel):
     def __init__(self, num_items, latent_dim=32, global_lr=0.001, local_lr=0.001):
         RAPBase.__init__(self)
@@ -77,10 +80,10 @@ class FedRAPServer(RAPBase, BaseServerModel):
         self.item_optimizer.step()
         self.serve_optimizer.zero_grad()
         self.item_optimizer.zero_grad()
-        
+
 
 class FedRAPClient(RAPBase, BaseClientModel):
-    def __init__(self, user_interaction, local_epochs, local_lr, num_items, 
+    def __init__(self, user_interaction, local_epochs, local_lr, num_items,
                  latent_dim=32, uid=torch.tensor(0), attr=None):
         RAPBase.__init__(self)
         BaseClientModel.__init__(self, local_epochs, local_lr)

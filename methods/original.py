@@ -1,13 +1,14 @@
 import os
+import pickle
+
 import torch
+from tqdm import tqdm
 
 from data.data_utils import prepare_data
-from utils.prepare_models import prepare_rec_model
-from utils.save_utils import construct_weight_path
 from modules.ClientCluster import ClientCluster
 from modules.Server import Server
-from tqdm import tqdm
-import pickle
+from utils.prepare_models import prepare_rec_model
+from utils.save_utils import construct_weight_path
 
 
 def original(args):
@@ -27,9 +28,7 @@ def original(args):
     for epoch in range(args.global_epochs):
         loss_list = {}
         serve.train_model(device=device, loss_list=loss_list)
-        # Calculate mean loss for each key in loss_list
         mean_loss_dict = {k: sum(v) / len(v) for k, v in loss_list.items()}
-        # Add loss_list to total_loss_list
         for k, v in mean_loss_dict.items():
             if k not in total_loss_dict:
                 total_loss_dict[k] = []
