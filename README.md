@@ -1,3 +1,5 @@
 # FedRecGEL
 
-In this repository, we provide the code implementaiton of FedRecGEL, which is encoupled with FedNCF method.
+We present the implementation of FedRecGEL in this repository.
+
+The dataset preprocessing scripts are available in `./data/datasets/data_process.ipynb`.

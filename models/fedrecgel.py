@@ -1,15 +1,14 @@
 import copy
 import random
-
 import torch
 import torch.nn as nn
 
 from models.base_federated import BaseServerModel, BaseClientModel
 
 
-class NCF(nn.Module):
+class FedRecGEL(nn.Module):
     def __init__(self):
-        super(NCF, self).__init__()
+        super(FedRecGEL, self).__init__()
 
     def forward(self, user, item):
         embed_user_gmf = self.embed_user_gmf(user)
@@ -38,9 +37,9 @@ class NCF(nn.Module):
         return [self.get_user_embedding_weight().grad]
 
 
-class NCFServer(NCF, BaseServerModel):
+class FedRecGELServer(FedRecGEL, BaseServerModel):
     def __init__(self, item_num, factor_num=32, num_layers=3, dropout=0.0, global_lr=0.001):
-        NCF.__init__(self)
+        FedRecGEL.__init__(self)
         BaseServerModel.__init__(self, global_lr)
         self.embed_item_gmf = nn.Embedding(item_num, factor_num)
         self.embed_item_mlp = nn.Embedding(item_num, factor_num * (2 ** (num_layers - 1)))
@@ -86,10 +85,10 @@ class NCFServer(NCF, BaseServerModel):
         self.serve_optimizer.zero_grad()
 
 
-class NCFClient(NCF, BaseClientModel):
+class FedRecGELClient(FedRecGEL, BaseClientModel):
     def __init__(self, user_interaction, local_epochs, local_lr, uid=torch.tensor(0), factor_num=32, num_layers=3,
                  attr=None):
-        NCF.__init__(self)
+        FedRecGEL.__init__(self)
         BaseClientModel.__init__(self, local_epochs, local_lr)
         self.embed_user_gmf = nn.Embedding(1, factor_num)
         self.embed_user_mlp = nn.Embedding(1, factor_num * (2 ** (num_layers - 1)))
@@ -248,7 +247,7 @@ class NCFClient(NCF, BaseClientModel):
     def get_client_modules(self):
         return torch.nn.ModuleList([self.embed_user_gmf, self.embed_user_mlp])
 
-    def refactoring(self, serve_model: NCFServer, clients_list):
+    def refactoring(self, serve_model: FedRecGELServer, clients_list):
         # Get total number of users
         total_users = len(clients_list)
         # Get embedding dimensions from the first client
@@ -276,12 +275,6 @@ class NCFClient(NCF, BaseClientModel):
         del self.mlp_layers
         del self.predict_layer
 
-
-# **********************************************************************************************************************#
-#                                                                                                                      #
-#                      Auxiliary Functions For FedRecGEL: Sharpness-Aware Minimization                                 #
-#                                                                                                                      #
-# **********************************************************************************************************************#
 
 def _group_params(modules):
     return [p for m in modules for p in m.parameters() if p.requires_grad]

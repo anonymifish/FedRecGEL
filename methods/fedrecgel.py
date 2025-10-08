@@ -11,7 +11,7 @@ from utils.prepare_models import prepare_rec_model
 from utils.save_utils import construct_weight_path
 
 
-def original(args):
+def fedrecgel(args):
     device = torch.device(args.device)
     train_loader, test_loader, user_num, item_num, train_mat = prepare_data(args)
     clients_list = []

@@ -3,7 +3,7 @@ import os
 
 import torch.backends.cudnn as cudnn
 
-from methods.original import original
+from methods.fedrecgel import fedrecgel
 from utils.save_utils import construct_logger
 
 
@@ -26,8 +26,8 @@ def initialize_settings(path):
 
 
 def federal_rec(args):
-    if args.method == 'original':
-        original(args)
+    if args.method == 'fedrecgel':
+        fedrecgel(args)
  
 
 if __name__ == '__main__':
